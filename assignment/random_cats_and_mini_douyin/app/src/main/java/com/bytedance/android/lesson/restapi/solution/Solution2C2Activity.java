@@ -18,7 +18,12 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.bytedance.android.lesson.restapi.solution.bean.Feed;
+import com.bytedance.android.lesson.restapi.solution.bean.FeedResponse;
+import com.bytedance.android.lesson.restapi.solution.bean.PostVideoResponse;
+import com.bytedance.android.lesson.restapi.solution.newtork.IMiniDouyinService;
+import com.bytedance.android.lesson.restapi.solution.newtork.RetrofitManager;
 import com.bytedance.android.lesson.restapi.solution.utils.ResourceUtils;
 
 import java.io.File;
@@ -28,6 +33,10 @@ import java.util.List;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
 
 public class Solution2C2Activity extends AppCompatActivity {
 
@@ -111,8 +120,8 @@ public class Solution2C2Activity extends AppCompatActivity {
                 ImageView iv = (ImageView) viewHolder.itemView;
 
                 // TODO-C2 (10) Uncomment these 2 lines, assign image url of Feed to this url variable
-//                String url = mFeeds.get(i).;
-//                Glide.with(iv.getContext()).load(url).into(iv);
+                String url = mFeeds.get(i).getImage_url();
+                Glide.with(iv.getContext()).load(url).into(iv);
             }
 
             @Override public int getItemCount() {
@@ -169,6 +178,30 @@ public class Solution2C2Activity extends AppCompatActivity {
 
         // TODO-C2 (6) Send Request to post a video with its cover image
         // if success, make a text Toast and show
+        Retrofit retrofit = RetrofitManager.get("http://test.androidcamp.bytedance.com/mini_douyin/");
+        IMiniDouyinService iMiniDouyinService = retrofit.create(IMiniDouyinService.class);
+        MultipartBody.Part cover_image = getMultipartFromUri("cover_image", mSelectedImage);
+        MultipartBody.Part video = getMultipartFromUri("video", mSelectedVideo);
+        Call<PostVideoResponse> postVideoResponseCall = iMiniDouyinService.createVideo("16061022", "What's Your Problem?", cover_image, video);
+
+        postVideoResponseCall.enqueue(new Callback<PostVideoResponse>() {
+            @Override
+            public void onResponse(Call<PostVideoResponse> call, Response<PostVideoResponse> response) {
+                Toast.makeText(getApplicationContext(), "Post succeeded", Toast.LENGTH_LONG).show();
+                Log.d(TAG, "onResponse: "+ response.body().isSuccess());
+                Log.d(TAG, "onResponse: " + response.body().getUrl());
+                mBtn.setText(R.string.select_an_image);
+                mBtn.setEnabled(true);
+            }
+
+            @Override
+            public void onFailure(Call<PostVideoResponse> call, Throwable t) {
+                Toast.makeText(getApplicationContext(), "Post failed", Toast.LENGTH_LONG).show();
+                mBtn.setText(R.string.select_an_image);
+                mBtn.setEnabled(true);
+                Log.d(TAG, "onFailure: " + t.getMessage());
+            }
+        });
     }
 
     public void fetchFeed(View view) {
@@ -178,6 +211,24 @@ public class Solution2C2Activity extends AppCompatActivity {
         // TODO-C2 (9) Send Request to fetch feed
         // if success, assign data to mFeeds and call mRv.getAdapter().notifyDataSetChanged()
         // don't forget to call resetRefreshBtn() after response received
+        Retrofit retrofit = RetrofitManager.get("http://test.androidcamp.bytedance.com/mini_douyin/");
+        IMiniDouyinService iMiniDouyinService = retrofit.create(IMiniDouyinService.class);
+        Call<FeedResponse> call = iMiniDouyinService.fetchVideos();
+
+        call.enqueue(new Callback<FeedResponse>() {
+            @Override
+            public void onResponse(Call<FeedResponse> call, Response<FeedResponse> response) {
+                mFeeds = response.body().getFeeds();
+                Log.d(TAG, "onResponse: " + response.body().isSuccess());
+                mRv.getAdapter().notifyDataSetChanged();
+                resetRefreshBtn();
+            }
+
+            @Override
+            public void onFailure(Call<FeedResponse> call, Throwable t) {
+                resetRefreshBtn();
+            }
+        });
     }
 
     private void resetRefreshBtn() {
